@@ -1,6 +1,5 @@
 use zellij_tile::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::collections::BTreeMap;
 use std::fmt;
 use owo_colors::OwoColorize;
@@ -22,7 +21,6 @@ struct State {
     cancel_key: KeyWithModifier,
     accept_key: KeyWithModifier,
     panes: Vec<Pane>,
-    selected: usize,
     current_pane_id: Option<u32>,
     latest_pane_manifest: Option<PaneManifest>,
 }
@@ -34,7 +32,6 @@ impl Default for State {
             cancel_key: KeyWithModifier::new(BareKey::Esc),
             accept_key: KeyWithModifier::new(BareKey::Char('y')),
             panes: Vec::new(),
-            selected: 0,
             current_pane_id: None,
             latest_pane_manifest: None,
         }
@@ -90,15 +87,6 @@ impl ZellijPlugin for State {
             },
             _ => {},
         };
-        should_render
-    }
-
-    fn pipe(&mut self, pipe_message: PipeMessage) -> bool {
-        let mut should_render = false;
-        // react to data piped to this plugin from the CLI, a keybinding or another plugin
-        // read more about pipes: https://zellij.dev/documentation/plugin-pipes
-        // return true if this plugin's `render` function should be called for the plugin to render
-        // itself
         should_render
     }
 
