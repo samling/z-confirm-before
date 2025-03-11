@@ -55,7 +55,7 @@ impl ZellijPlugin for State {
             PermissionType::WriteToStdin,
             PermissionType::ReadApplicationState
         ]);
-        subscribe(&[EventType::Key, EventType::PaneUpdate, EventType::ModeUpdate]);
+        subscribe(&[EventType::Key, EventType::PaneUpdate, EventType::ModeUpdate, EventType::TabUpdate]);
 
         if let Some(confirm_key) = configuration.get("confirm_key") {
             self.confirm_key = confirm_key.parse().unwrap_or(self.confirm_key.clone());
@@ -82,6 +82,10 @@ impl ZellijPlugin for State {
             },
             Event::PaneUpdate(pane_manifest) => {
                 self.update_pane_info(pane_manifest);
+                should_render = true;
+            },
+            Event::TabUpdate(tabs) => {
+                self.update_tab_info(tabs);
                 should_render = true;
             },
             _ => {},
@@ -115,6 +119,16 @@ impl ZellijPlugin for State {
 }
 
 impl State {
+    fn update_tab_info(&mut self, tabs: Vec<TabInfo>) {
+        for tab in tabs {
+            for pane in &mut self.panes {
+                if pane.tab_info.position == tab.position {
+                    pane.tab_info = tab.clone();
+                }
+            }
+        }
+    }
+
     fn update_pane_info(&mut self, pane_manifest: PaneManifest) {
         self.latest_pane_manifest = Some(pane_manifest.clone());
         
@@ -128,12 +142,12 @@ impl State {
                     self.current_pane_id = Some(pane_info.id);
                 }
                 
-                // Create a TabInfo with all required fields
+                // Create a placeholder TabInfo - this will be updated when we receive tab updates
                 let tab_info = TabInfo {
                     position: *tab_index as usize,
                     name: format!("Tab {}", tab_index),
-                    active: false, // We don't know which tab is active from PaneManifest
-                    panes_to_hide: 0, // Default to 0 suppressed panes
+                    active: false,
+                    panes_to_hide: 0,
                     is_fullscreen_active: false,
                     is_sync_panes_active: false,
                     are_floating_panes_visible: false,
