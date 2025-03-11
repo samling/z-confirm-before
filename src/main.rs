@@ -19,20 +19,20 @@ impl fmt::Display for Pane {
 struct State {
     confirm_key: KeyWithModifier,
     cancel_key: KeyWithModifier,
-    accept_key: KeyWithModifier,
     panes: Vec<Pane>,
     current_pane_id: Option<u32>,
+    target_pane_id: Option<u32>,
     latest_pane_manifest: Option<PaneManifest>,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            confirm_key: KeyWithModifier::new(BareKey::Enter),
-            cancel_key: KeyWithModifier::new(BareKey::Esc),
-            accept_key: KeyWithModifier::new(BareKey::Char('y')),
+            confirm_key: KeyWithModifier::new(BareKey::Char('y')),
+            cancel_key: KeyWithModifier::new(BareKey::Char('n')),
             panes: Vec::new(),
             current_pane_id: None,
+            target_pane_id: None,
             latest_pane_manifest: None,
         }
     }
@@ -50,7 +50,7 @@ impl ZellijPlugin for State {
         request_permission(&[
             PermissionType::ChangeApplicationState,
             PermissionType::WriteToStdin,
-            PermissionType::ReadApplicationState
+            PermissionType::ReadApplicationState,
         ]);
         subscribe(&[EventType::Key, EventType::PaneUpdate, EventType::ModeUpdate, EventType::TabUpdate]);
 
@@ -60,17 +60,18 @@ impl ZellijPlugin for State {
         if let Some(abort_key) = configuration.get("cancel_key") {
             self.cancel_key = abort_key.parse().unwrap_or(self.cancel_key.clone());
         }
-        if let Some(accept_key) = configuration.get("accept_key") {
-            self.accept_key = accept_key.parse().unwrap_or(self.accept_key.clone());
-        }
     }
     
     fn update(&mut self, event: Event) -> bool {
         let mut should_render = false;
         match event {
             Event::Key(key) => {
-                if self.accept_key == key {
+                if self.confirm_key == key {
                     // Just render the current pane ID
+                    if let Some(pane_id) = self.target_pane_id {
+                        close_terminal_pane(pane_id);
+                        hide_self();
+                    }
                     should_render = true;
                 } else if self.cancel_key == key {
                     // Close the plugin
@@ -78,6 +79,14 @@ impl ZellijPlugin for State {
                 }
             },
             Event::PaneUpdate(pane_manifest) => {
+                for (_tab_idx, panes) in pane_manifest.panes.iter() {
+                    for pane in panes {
+                        if pane.is_focused {
+                            self.target_pane_id = Some(pane.id);
+                            break;
+                        }
+                    }
+                }
                 self.update_pane_info(pane_manifest);
                 should_render = true;
             },
@@ -91,9 +100,13 @@ impl ZellijPlugin for State {
     }
 
     fn render(&mut self, _rows: usize, _cols: usize) {
+        // switch_to_input_mode(&InputMode::Normal);
+
         if let Some(pane_id) = self.current_pane_id {
             // Find the pane with the matching ID
             let pane_info = self.panes.iter().find(|p| p.pane_info.id == pane_id);
+
+            println!("Close pane? [y/n]");
             
             if let Some(pane) = pane_info {
                 println!("{}", pane.to_string().green().bold());
